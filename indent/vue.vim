@@ -50,13 +50,12 @@ function! GetVueIndent()
     endif
   endfor
 
-  if exists('l:indent')
-    if (opening_tag_line == prevnonblank(v:lnum - 1) || opening_tag_line == v:lnum)
-          \ || getline(v:lnum) =~ '\v^\s*\</(script|style|template)'
-      return 0
-    endif
-  else
-    " Couldn't find language, fall back to html
+  if !exists('l:indent') ||
+        \ opening_tag_line == v:lnum ||
+        \ opening_tag_line == prevnonblank(v:lnum - 1) ||
+        \ getline(v:lnum) =~ '\v^\s*\</(script|style|template)'
+    " Couldn't find language, open/close tag, or first line of language
+    " block. Fall back to html indentation
     execute 'let indent = ' . s:html_indent
   endif
 
