@@ -6,33 +6,36 @@
 if exists('b:did_indent')
   finish
 endif
-
-function! s:get_indentexpr(language)
-  unlet! b:did_indent
-  execute 'runtime! indent/' . a:language . '.vim'
-  return &indentexpr
-endfunction
+let b:did_indent = 1
 
 " The order is important here, tags without attributes go last.
 " HTML is left out, it will be used when there is no match.
-let s:languages = [
-      \   { 'name': 'pug', 'pairs': ['<template lang="pug"', '</template>'] },
-      \   { 'name': 'stylus', 'pairs': ['<style lang="stylus"', '</style>'] },
-      \   { 'name': 'css', 'pairs': ['<style', '</style>'] },
-      \   { 'name': 'coffee', 'pairs': ['<script lang="coffee"', '</script>'] },
-      \   { 'name': 'javascript', 'pairs': ['<script', '</script>'] },
-      \ ]
+if !exists('g:vue_indent_languages')
+  let g:vue_indent_languages = [
+        \   { 'name': 'pug', 'pairs': ['<template lang="pug"', '</template>'] },
+        \   { 'name': 'stylus', 'pairs': ['<style lang="stylus"', '</style>'] },
+        \   { 'name': 'css', 'pairs': ['<style', '</style>'] },
+        \   { 'name': 'coffee', 'pairs': ['<script lang="coffee"', '</script>'] },
+        \   { 'name': 'javascript', 'pairs': ['<script', '</script>'] },
+        \ ]
+endif
 
-for s:language in s:languages
-  " Set 'indentexpr' if the user has an indent file installed for the language
-  if strlen(globpath(&rtp, 'indent/'. s:language.name .'.vim'))
-    let s:language.indentexpr = s:get_indentexpr(s:language.name)
+" Load and return the indentexpr for language, resetting indentexpr to its
+" prior value before returning.
+function! s:get_indentexpr(language)
+  let saved_indentexpr = &indentexpr
+  let &l:indentexpr = ''
+  if strlen(globpath(&rtp, 'indent/'. a:language .'.vim'))
+    unlet! b:did_indent
+    execute 'runtime! indent/' . a:language . '.vim'
+    let b:did_indent = 1
   endif
-endfor
+  let lang_indentexpr = &indentexpr
+  let &l:indentexpr = saved_indentexpr
+  return lang_indentexpr
+endfunction
 
 let s:html_indent = s:get_indentexpr('html')
-
-let b:did_indent = 1
 
 setlocal indentexpr=GetVueIndent()
 
@@ -41,11 +44,16 @@ if exists('*GetVueIndent')
 endif
 
 function! GetVueIndent()
-  for language in s:languages
+  for language in g:vue_indent_languages
     let opening_tag_line = searchpair(language.pairs[0], '', language.pairs[1], 'bWr')
 
     if opening_tag_line
-      execute 'let indent = ' . get(language, 'indentexpr', -1)
+      if !has_key(language, 'indentexpr')
+        let language.indentexpr = s:get_indentexpr(language.name)
+      endif
+      if !empty(language.indentexpr)
+        execute 'let indent = ' . get(language, 'indentexpr', -1)
+      endif
       break
     endif
   endfor
